@@ -68,7 +68,7 @@ fn create_files_vector(paths: fs::ReadDir) -> Vec<File> {
 
 // Handle commands with multiple files or directories to list, but without any parameter.
 fn multiple_print_no_parameter(args: Vec<String>) {
-    let mut counter: usize = 1;
+    let counter = 1;
 
     if args[1].chars().nth(0).unwrap() != '-' {
         if args.len() > 2 {
@@ -133,6 +133,7 @@ fn get_terminal_width() -> Result<u16, String> {
 // The function used when all that is needed is to output the files, without information about
 // them.
 fn simple_print(mut files: Vec<File>) {
+    // The terminal width is necessary to find how many columns are needed, see get_matrix_size().
     let terminal_width = match get_terminal_width() {
         Ok(terminal_width) => terminal_width,
         Err(error_message) => {
@@ -141,30 +142,55 @@ fn simple_print(mut files: Vec<File>) {
         }
     };
 
+    // Remove all the files where the name starts with a dot.
     files.retain(|file| !file.path_name.starts_with('.'));
-    let column_length = files
+    let column_length = get_column_length(&files);
+    let (number_of_rows, number_of_columns) =
+        get_matrix_size(&files, terminal_width as usize, column_length);
+
+    let file_matrix = assemble_file_matrix(number_of_columns, number_of_rows, files);
+    transpose_print(file_matrix, column_length);
+}
+
+// Returns the length of the longest path name in the "files" vector, adding 1 for spacing.
+fn get_column_length(files: &Vec<File>) -> usize {
+    files
         .iter()
         .max_by_key(|file| file.path_name.len())
         .unwrap()
         .path_name
         .len()
-        + 1;
-    let initial_number_of_columns = (terminal_width as usize) / column_length;
+        + 1
+}
+
+// Returns the size of the file matrix in terms of the number of rows and columns.
+fn get_matrix_size(
+    files: &Vec<File>,
+    terminal_width: usize,
+    column_length: usize,
+) -> (usize, usize) {
+    // We first divide the width of the terminal the command is being used in, by the length
+    // of the columns (which is the length of the longest file name + 1 (for the spacing), see
+    // get_column_length()).
+    let initial_number_of_columns = (terminal_width) / column_length;
+    // Based on the initial estimate of columns, we can find the number of rows.
     let mut number_of_rows = files.len() / initial_number_of_columns;
+    // If the division had a rest, we need to add an additional row.
     if files.len() % initial_number_of_columns != 0 {
         number_of_rows += 1;
     }
 
+    // If the division had a rest, we need to add an additional column.
     let leftover_files_column = if files.len() % (number_of_rows) != 0 {
         1
     } else {
         0
     };
 
+    // We can now find the exact right amount of needed columns.
     let number_of_columns = files.len() / number_of_rows + leftover_files_column;
 
-    let file_matrix = assemble_file_matrix(number_of_columns, number_of_rows, files);
-    transpose_print(file_matrix, column_length);
+    (number_of_rows, number_of_columns)
 }
 
 // Creates a 2D vector of files, based on the 1D "files" vector. The rows and columns are inverted,
