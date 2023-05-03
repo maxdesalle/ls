@@ -2,27 +2,47 @@ use colored::ColoredString;
 use colored::Colorize;
 use std::env;
 use std::fs;
+use std::fs::Metadata;
+use std::fs::Permissions;
+use std::fs::ReadDir;
 use std::os::macos::fs::MetadataExt;
 use std::path::Path;
-use std::time;
+use std::path::PathBuf;
+use std::time::SystemTime;
 use terminal_size::{terminal_size, Width};
 
 #[allow(warnings)]
 #[derive(Debug, Clone)]
 struct File {
     is_dir: bool,
-    file_mode: fs::Permissions,
+    file_mode: Permissions,
     number_of_links: u32,
     owner_name: String,
     group_name: String,
     number_of_bytes: u64,
-    last_modified: time::SystemTime,
+    last_modified: SystemTime,
     path_name: String,
 }
 
-// impl File {
-//     fn new(path: metadata: &Metadata)
-// }
+impl File {
+    fn new(path: PathBuf, metadata: Metadata) -> File {
+        File {
+            is_dir: metadata.is_dir(),
+            file_mode: metadata.permissions(),
+            number_of_links: 0,
+            owner_name: metadata.st_gid().to_string(),
+            group_name: metadata.st_gid().to_string(),
+            number_of_bytes: metadata.len(),
+            last_modified: metadata.modified().unwrap(),
+            path_name: path
+                .file_name()
+                .unwrap()
+                .to_os_string()
+                .into_string()
+                .unwrap(),
+        }
+    }
+}
 
 // Orders a vector of File objects alphabetically based on their path_name variable.
 fn alphabetically_rank(files: &mut Vec<File>) {
@@ -40,24 +60,20 @@ fn alphabetically_rank(files: &mut Vec<File>) {
 
 // Assembles the vector returned in create_files_vector() by filling each File object with the
 // given metadata.
-fn insert_path_in_vector(paths: fs::ReadDir, files: &mut Vec<File>) {
+fn insert_path_in_vector(paths: ReadDir, files: &mut Vec<File>) {
     for path in paths {
-        let metadata = path.as_ref().unwrap().metadata().unwrap();
-        files.push(File {
-            is_dir: metadata.is_dir(),
-            file_mode: metadata.permissions(),
-            number_of_links: 0,
-            owner_name: metadata.st_gid().to_string(),
-            group_name: metadata.st_gid().to_string(),
-            number_of_bytes: metadata.len(),
-            last_modified: metadata.modified().unwrap(),
-            path_name: path.unwrap().file_name().into_string().unwrap(),
-        });
+        match path {
+            Ok(path) => {
+                let metadata = path.metadata().unwrap();
+                files.push(File::new(path.path(), metadata));
+            }
+            Err(error_message) => println!("{}", error_message),
+        }
     }
 }
 
 // Returns a simple vector of File objects based on the given path.
-fn create_files_vector(paths: fs::ReadDir) -> Vec<File> {
+fn create_files_vector(paths: ReadDir) -> Vec<File> {
     let mut files: Vec<File> = Vec::new();
 
     insert_path_in_vector(paths, &mut files);
@@ -74,13 +90,24 @@ fn multiple_print_no_parameter(args: Vec<String>) {
         if args.len() > 2 {
             handle_multiple_arguments(args);
         } else {
-            match one_argument(&args[counter]) {
-                Ok(files) => simple_print(files),
-                Err(error_message) => println!("{}", error_message),
+            if is_file(&args[counter]) {
+                println!("{}", &args[counter]);
+            } else {
+                match one_argument(&args[counter]) {
+                    Ok(files) => simple_print(files),
+                    Err(error_message) => println!("{}", error_message),
+                }
             }
         }
     } else {
     }
+}
+
+// Checks if the path points to a file or a directory.
+fn is_file(target_path: &str) -> bool {
+    let path = Path::new(target_path);
+
+    path.is_file()
 }
 
 // Iterates through all the command's arguments to print them one by one according to the
@@ -89,15 +116,22 @@ fn handle_multiple_arguments(args: Vec<String>) {
     let mut counter: usize = 1;
 
     while counter != args.len() {
-        match one_argument(&args[counter]) {
-            Ok(files) => {
-                println!("{}:", &args[counter]);
-                simple_print(files);
-                if counter != args.len() - 1 {
-                    println!();
-                }
+        if is_file(&args[counter]) {
+            println!("{}", &args[counter]);
+            if counter != args.len() - 1 {
+                println!();
             }
-            Err(error_message) => println!("{}", error_message),
+        } else {
+            match one_argument(&args[counter]) {
+                Ok(files) => {
+                    println!("{}:", &args[counter]);
+                    simple_print(files);
+                    if counter != args.len() - 1 {
+                        println!();
+                    }
+                }
+                Err(error_message) => println!("{}", error_message),
+            }
         }
         counter += 1;
     }
@@ -133,6 +167,10 @@ fn get_terminal_width() -> Result<u16, String> {
 // The function used when all that is needed is to output the files, without information about
 // them.
 fn simple_print(mut files: Vec<File>) {
+    if files.len() == 1 {
+        print!("{}", color_print(&files[0]));
+        return;
+    }
     // The terminal width is necessary to find how many columns are needed, see get_matrix_size().
     let terminal_width = match get_terminal_width() {
         Ok(terminal_width) => terminal_width,
@@ -243,7 +281,9 @@ fn transpose_print(file_matrix: Vec<Vec<File>>, column_length: usize) {
 // Handles function calls without any parameter or multiple arguments, is also used to handle each
 // argument independently.
 fn one_argument(target_path: &str) -> Result<Vec<File>, String> {
-    match fs::read_dir(&Path::new(target_path)) {
+    let path = Path::new(target_path);
+
+    match fs::read_dir(&path) {
         Ok(path) => Ok(create_files_vector(path)),
         Err(_) => Err(format!("ls: {}: No such file or directory", target_path).to_string()),
     }
