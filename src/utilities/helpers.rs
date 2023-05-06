@@ -7,9 +7,19 @@ pub fn alphabetically_rank_files(files: &mut Vec<File>) {
     files.sort_unstable_by(|a, b| a.path_name.partial_cmp(&b.path_name).unwrap());
 }
 
+// Orders a vector of File objects alphabetically in reverse based on their path_name variable.
+pub fn reverse_alphabetically_rank_files(files: &mut Vec<File>) {
+    files.sort_unstable_by(|a, b| b.path_name.partial_cmp(&a.path_name).unwrap());
+}
+
 // Orders a vector of strings alphabetically.
 pub fn alphabetically_rank_strings(strings: &mut Vec<String>) {
     strings.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
+}
+
+// Orders a vector of strings alphabetically in reverse.
+pub fn reverse_alphabetically_rank_strings(strings: &mut Vec<String>) {
+    strings.sort_unstable_by(|a, b| b.partial_cmp(a).unwrap());
 }
 
 // Checks if the path points to a file or a directory.

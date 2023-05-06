@@ -13,7 +13,7 @@ use execution::unexisting_files::*;
 
 fn main() {
     if env::args().len() == 1 {
-        match one_argument("./") {
+        match one_argument("./", &Parameters::new()) {
             Ok(files) => simple_print(files),
             Err(error_message) => println!("{}", error_message),
         }

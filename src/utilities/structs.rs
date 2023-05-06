@@ -3,6 +3,24 @@ use std::os::macos::fs::MetadataExt;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
+pub struct Parameters {
+    pub include_dot_files: bool,
+    pub long_format: bool,
+    pub reverse_order: bool,
+    pub recursive_listing: bool,
+}
+
+impl Parameters {
+    pub fn new() -> Parameters {
+        Parameters {
+            include_dot_files: false,
+            long_format: false,
+            reverse_order: false,
+            recursive_listing: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct File {
     pub is_dir: bool,

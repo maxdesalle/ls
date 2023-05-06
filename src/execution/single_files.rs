@@ -91,11 +91,16 @@ fn simple_print_single_files(files: &Vec<String>) {
     transpose_print_single_files(file_matrix, column_length);
 }
 
-pub fn handle_single_files(args: &mut Vec<String>) -> bool {
+pub fn handle_single_files(args: &mut Vec<String>, parameters: &Parameters) -> bool {
     let mut single_files = find_single_files(args);
 
     remove_single_files(args, &mut single_files);
-    alphabetically_rank_strings(&mut single_files);
+
+    if parameters.reverse_order == true {
+        reverse_alphabetically_rank_strings(&mut single_files);
+    } else {
+        alphabetically_rank_strings(&mut single_files);
+    }
 
     if !single_files.is_empty() {
         simple_print_single_files(&single_files);

@@ -19,20 +19,25 @@ fn insert_path_in_vector(paths: ReadDir, files: &mut Vec<File>) {
 }
 
 // Returns a simple vector of File objects based on the given path.
-fn create_files_vector(paths: ReadDir) -> Vec<File> {
+fn create_files_vector(paths: ReadDir, parameters: &Parameters) -> Vec<File> {
     let mut files: Vec<File> = Vec::new();
 
     insert_path_in_vector(paths, &mut files);
-    alphabetically_rank_files(&mut files);
+
+    if parameters.reverse_order == true {
+        reverse_alphabetically_rank_files(&mut files);
+    } else {
+        alphabetically_rank_files(&mut files);
+    }
 
     return files;
 }
 
-fn handle_single_arguments(target_path: &str) {
+fn handle_single_arguments(target_path: &str, parameters: &Parameters) {
     if is_file(target_path) {
         println!("{}", target_path);
     } else {
-        match one_argument(target_path) {
+        match one_argument(target_path, parameters) {
             Ok(files) => simple_print(files),
             Err(error_message) => println!("{}", error_message),
         }
@@ -40,14 +45,14 @@ fn handle_single_arguments(target_path: &str) {
 }
 
 // Handle commands with multiple files or directories to list, but without any parameter.
-fn handle_folders(args: Vec<String>, multiple_arguments: bool) {
+fn handle_folders(args: Vec<String>, multiple_arguments: bool, parameters: &Parameters) {
     let counter = 0;
 
     if args[0].chars().nth(0).unwrap() != '-' {
         if args.len() > 1 || multiple_arguments == true {
-            handle_multiple_arguments(args);
+            handle_multiple_arguments(args, parameters);
         } else {
-            handle_single_arguments(&args[counter]);
+            handle_single_arguments(&args[counter], parameters);
         }
     } else {
     }
@@ -55,7 +60,7 @@ fn handle_folders(args: Vec<String>, multiple_arguments: bool) {
 
 // Iterates through all the command's arguments to print them one by one according to the
 // formatting of the "ls" command.
-fn handle_multiple_arguments(args: Vec<String>) {
+fn handle_multiple_arguments(args: Vec<String>, parameters: &Parameters) {
     let mut counter = 0;
 
     while counter != args.len() {
@@ -65,12 +70,12 @@ fn handle_multiple_arguments(args: Vec<String>) {
                 println!();
             }
         } else {
-            match one_argument(&args[counter]) {
+            match one_argument(&args[counter], parameters) {
                 Ok(files) => {
                     println!("{}:", &args[counter]);
                     simple_print(files);
                     if counter != args.len() - 1 {
-                        println!("\n");
+                        println!();
                     }
                 }
                 Err(error_message) => println!("{}", error_message),
@@ -80,21 +85,58 @@ fn handle_multiple_arguments(args: Vec<String>) {
     }
 }
 
+fn parse_parameters(args: &mut Vec<String>) -> Parameters {
+    let mut parameters = Parameters::new();
+
+    if !args[0].starts_with("-") {
+        return parameters;
+    }
+
+    if args[0].contains("a") {
+        parameters.include_dot_files = true;
+    }
+
+    if args[0].contains("l") {
+        parameters.long_format = true;
+    }
+
+    if args[0].contains("r") {
+        parameters.reverse_order = true;
+    }
+
+    if args[0].contains("R") {
+        parameters.recursive_listing = true;
+    }
+
+    args.remove(0);
+    if args.is_empty() {
+        args.push("./".to_string());
+    }
+
+    return parameters;
+}
+
 // Handles both commands with multiple arguments but without parameters, and vice-versa.
 pub fn handle_command() {
     let mut args: Vec<String> = env::args().collect();
 
     args.remove(0);
 
+    let parameters = parse_parameters(&mut args);
+
     handle_unexisting_files(&mut args);
-    let empty_single_files = handle_single_files(&mut args);
+    let empty_single_files = handle_single_files(&mut args, &parameters);
+
+    if parameters.reverse_order == true {
+        reverse_alphabetically_rank_strings(&mut args);
+    }
 
     if !args.is_empty() {
         if empty_single_files == true {
-            handle_folders(args, false);
+            handle_folders(args, false, &parameters);
         } else {
             println!();
-            handle_folders(args, true);
+            handle_folders(args, true, &parameters);
         }
     }
 }
@@ -213,11 +255,11 @@ fn transpose_print(file_matrix: Vec<Vec<File>>, column_length: usize) {
 
 // Handles function calls without any parameter or multiple arguments, is also used to handle each
 // argument independently.
-pub fn one_argument(target_path: &str) -> Result<Vec<File>, String> {
+pub fn one_argument(target_path: &str, parameters: &Parameters) -> Result<Vec<File>, String> {
     let path = Path::new(target_path);
 
     match fs::read_dir(&path) {
-        Ok(path) => Ok(create_files_vector(path)),
+        Ok(path) => Ok(create_files_vector(path, parameters)),
         Err(_) => Err(format!("ls: {}: No such file or directory", target_path).to_string()),
     }
 }
