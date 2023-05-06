@@ -1,58 +1,13 @@
-use colored::ColoredString;
-use colored::Colorize;
-use std::env;
-use std::fs;
-use std::fs::Metadata;
-use std::fs::Permissions;
+use colored::{ColoredString, Colorize};
 use std::fs::ReadDir;
-use std::os::macos::fs::MetadataExt;
 use std::path::Path;
-use std::path::PathBuf;
-use std::time::SystemTime;
-use terminal_size::{terminal_size, Width};
+use std::{env, fs};
+
+mod utilities;
+use utilities::helpers::*;
+use utilities::structs::*;
 
 #[allow(warnings)]
-#[derive(Debug, Clone)]
-struct File {
-    is_dir: bool,
-    file_mode: Permissions,
-    number_of_links: u32,
-    owner_name: String,
-    group_name: String,
-    number_of_bytes: u64,
-    last_modified: SystemTime,
-    path_name: String,
-}
-
-impl File {
-    fn new(path: PathBuf, metadata: Metadata) -> File {
-        File {
-            is_dir: metadata.is_dir(),
-            file_mode: metadata.permissions(),
-            number_of_links: 0,
-            owner_name: metadata.st_gid().to_string(),
-            group_name: metadata.st_gid().to_string(),
-            number_of_bytes: metadata.len(),
-            last_modified: metadata.modified().unwrap(),
-            path_name: path
-                .file_name()
-                .unwrap()
-                .to_os_string()
-                .into_string()
-                .unwrap(),
-        }
-    }
-}
-
-// Orders a vector of File objects alphabetically based on their path_name variable.
-fn alphabetically_rank_files(files: &mut Vec<File>) {
-    files.sort_unstable_by(|a, b| a.path_name.partial_cmp(&b.path_name).unwrap());
-}
-
-// Orders a vector of strings alphabetically.
-fn alphabetically_rank_strings(strings: &mut Vec<String>) {
-    strings.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
-}
 
 // Assembles the vector returned in create_files_vector() by filling each File object with the
 // given metadata.
@@ -101,20 +56,6 @@ fn print_no_parameter(args: Vec<String>, multiple_arguments: bool) {
         }
     } else {
     }
-}
-
-// Checks if the path points to a file or a directory.
-fn is_file(target_path: &str) -> bool {
-    let path = Path::new(target_path);
-
-    path.is_file()
-}
-
-// Checks if the path points to a file or a directory.
-fn file_exists(target_path: &str) -> bool {
-    let path = Path::new(target_path);
-
-    path.exists()
 }
 
 // Iterates through all the command's arguments to print them one by one according to the
@@ -244,10 +185,6 @@ fn transpose_print_single_files(file_matrix: Vec<Vec<String>>, column_length: us
     }
 }
 
-fn return_index_for_object(args: &mut Vec<String>, object_to_find: &String) -> usize {
-    args.iter().position(|x| *x == *object_to_find).unwrap()
-}
-
 fn remove_unexisting_files(args: &mut Vec<String>, unexisting_files: &mut Vec<String>) {
     let mut counter = 0;
 
@@ -316,17 +253,6 @@ fn color_print(file: &File) -> ColoredString {
         return format!("{}", file.path_name).cyan().bold();
     } else {
         return format!("{}", file.path_name).white();
-    }
-}
-
-// Gets the width of the terminal, so the number of columns the "ls" command outputs can be
-// calculated.
-fn get_terminal_width() -> Result<u16, String> {
-    let size = terminal_size();
-
-    match size {
-        Some((Width(w), _)) => Ok(w),
-        None => Err(format!("Unable to get terminal size")),
     }
 }
 
