@@ -144,7 +144,7 @@ fn handle_multiple_arguments(args: Vec<String>) {
     }
 }
 
-fn collect_single_files(args: &mut Vec<String>) -> Vec<String> {
+fn find_single_files(args: &mut Vec<String>) -> Vec<String> {
     let mut counter = 0;
     let mut single_files: Vec<String> = Vec::new();
 
@@ -154,16 +154,26 @@ fn collect_single_files(args: &mut Vec<String>) -> Vec<String> {
         }
         counter += 1;
     }
-    counter = 0;
+
+    single_files
+}
+
+fn remove_single_files(args: &mut Vec<String>, single_files: &mut Vec<String>) {
+    let mut counter = 0;
+
     while counter != single_files.len() {
-        let index = args
-            .iter()
-            .position(|x| *x == single_files[counter])
-            .unwrap();
+        let index = return_index_for_object(args, &single_files[counter]);
         args.remove(index);
         counter += 1;
     }
+}
+
+fn collect_single_files(args: &mut Vec<String>) -> Vec<String> {
+    let mut single_files = find_single_files(args);
+
+    remove_single_files(args, &mut single_files);
     alphabetically_rank_strings(&mut single_files);
+
     single_files
 }
 
