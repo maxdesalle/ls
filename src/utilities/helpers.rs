@@ -40,3 +40,19 @@ pub fn get_terminal_width() -> Result<u16, String> {
         None => Err(format!("Unable to get terminal size")),
     }
 }
+
+// Returns the length of the longest path name in the "files" vector, adding 1 for spacing.
+pub fn get_column_length_single_files(files: &Vec<String>) -> usize {
+    files.iter().max_by_key(|file| file.len()).unwrap().len() + 1
+}
+
+// Returns the length of the longest path name in the "files" vector, adding 1 for spacing.
+pub fn get_column_length(files: &Vec<File>) -> usize {
+    files
+        .iter()
+        .max_by_key(|file| file.path_name.len())
+        .unwrap()
+        .path_name
+        .len()
+        + 1
+}
