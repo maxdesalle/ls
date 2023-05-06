@@ -1,5 +1,5 @@
 use crate::File;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use terminal_size::{terminal_size, Width};
 
 // Orders a vector of File objects alphabetically based on their path_name variable.
@@ -65,4 +65,12 @@ pub fn get_column_length(files: &Vec<File>) -> usize {
         .path_name
         .len()
         + 1
+}
+
+pub fn get_path_name(path: PathBuf) -> String {
+    path.file_name()
+        .unwrap()
+        .to_os_string()
+        .into_string()
+        .unwrap()
 }

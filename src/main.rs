@@ -13,8 +13,9 @@ use execution::unexisting_files::*;
 
 fn main() {
     if env::args().len() == 1 {
-        match one_argument("./", &Parameters::new()) {
-            Ok(files) => simple_print(files),
+        let parameters = Parameters::new();
+        match one_argument("./", &parameters) {
+            Ok(files) => simple_print(files, &parameters),
             Err(error_message) => println!("{}", error_message),
         }
     } else {

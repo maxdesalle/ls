@@ -1,17 +1,27 @@
 use crate::*;
 use colored::{ColoredString, Colorize};
-use std::fs::ReadDir;
+use std::env;
+use std::fs::{read_dir, ReadDir};
 use std::path::Path;
-use std::{env, fs};
 
 // Assembles the vector returned in create_files_vector() by filling each File object with the
 // given metadata.
-fn insert_path_in_vector(paths: ReadDir, files: &mut Vec<File>) {
+fn insert_path_in_vector(paths: ReadDir, files: &mut Vec<File>, parameters: &Parameters) {
+    if parameters.include_dot_files == true {
+        let current_folder = Path::new(".");
+        let parent_folder = Path::new("..");
+
+        let current_metadata = current_folder.metadata().unwrap();
+        let parent_metadata = parent_folder.metadata().unwrap();
+
+        files.push(File::new(".".to_string(), current_metadata));
+        files.push(File::new("..".to_string(), parent_metadata));
+    }
     for path in paths {
         match path {
             Ok(path) => {
                 let metadata = path.metadata().unwrap();
-                files.push(File::new(path.path(), metadata));
+                files.push(File::new(get_path_name(path.path()), metadata));
             }
             Err(error_message) => println!("{}", error_message),
         }
@@ -22,7 +32,7 @@ fn insert_path_in_vector(paths: ReadDir, files: &mut Vec<File>) {
 fn create_files_vector(paths: ReadDir, parameters: &Parameters) -> Vec<File> {
     let mut files: Vec<File> = Vec::new();
 
-    insert_path_in_vector(paths, &mut files);
+    insert_path_in_vector(paths, &mut files, parameters);
 
     if parameters.reverse_order == true {
         reverse_alphabetically_rank_files(&mut files);
@@ -38,7 +48,7 @@ fn handle_single_arguments(target_path: &str, parameters: &Parameters) {
         println!("{}", target_path);
     } else {
         match one_argument(target_path, parameters) {
-            Ok(files) => simple_print(files),
+            Ok(files) => simple_print(files, parameters),
             Err(error_message) => println!("{}", error_message),
         }
     }
@@ -73,7 +83,7 @@ fn handle_multiple_arguments(args: Vec<String>, parameters: &Parameters) {
             match one_argument(&args[counter], parameters) {
                 Ok(files) => {
                     println!("{}:", &args[counter]);
-                    simple_print(files);
+                    simple_print(files, parameters);
                     if counter != args.len() - 1 {
                         println!();
                     }
@@ -152,7 +162,7 @@ fn color_print(file: &File) -> ColoredString {
 
 // The function used when all that is needed is to output the files, without information about
 // them.
-pub fn simple_print(mut files: Vec<File>) {
+pub fn simple_print(mut files: Vec<File>, parameters: &Parameters) {
     if files.len() == 1 {
         print!("{}", color_print(&files[0]));
         return;
@@ -166,8 +176,10 @@ pub fn simple_print(mut files: Vec<File>) {
         }
     };
 
-    // Remove all the files where the name starts with a dot.
-    files.retain(|file| !file.path_name.starts_with('.'));
+    // Remove all the files where the name starts with a dot, if the -a parameter was not included.
+    if parameters.include_dot_files == false {
+        files.retain(|file| !file.path_name.starts_with('.'));
+    }
     let column_length = get_column_length(&files);
     let (number_of_rows, number_of_columns) =
         get_matrix_size(files.len(), terminal_width as usize, column_length);
@@ -258,7 +270,7 @@ fn transpose_print(file_matrix: Vec<Vec<File>>, column_length: usize) {
 pub fn one_argument(target_path: &str, parameters: &Parameters) -> Result<Vec<File>, String> {
     let path = Path::new(target_path);
 
-    match fs::read_dir(&path) {
+    match read_dir(&path) {
         Ok(path) => Ok(create_files_vector(path, parameters)),
         Err(_) => Err(format!("ls: {}: No such file or directory", target_path).to_string()),
     }
