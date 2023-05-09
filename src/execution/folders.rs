@@ -1,8 +1,28 @@
 use crate::*;
+use chrono::{DateTime, Local};
 use colored::{ColoredString, Colorize};
 use std::env;
+use std::fs::read_link;
 use std::fs::{read_dir, ReadDir};
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
+use xattr;
+
+fn check_extended_attributes(path: &Path) -> bool {
+    match xattr::list(path) {
+        Ok(attributes) => {
+            if attributes.peekable().peek().is_none() {
+                return false;
+            } else {
+                return true;
+            }
+        }
+        Err(err) => {
+            println!("Error: {}", err);
+            return false;
+        }
+    }
+}
 
 // Assembles the vector returned in create_files_vector() by filling each File object with the
 // given metadata.
@@ -14,14 +34,26 @@ fn insert_path_in_vector(paths: ReadDir, files: &mut Vec<File>, parameters: &Par
         let current_metadata = current_folder.metadata().unwrap();
         let parent_metadata = parent_folder.metadata().unwrap();
 
-        files.push(File::new(".".to_string(), current_metadata));
-        files.push(File::new("..".to_string(), parent_metadata));
+        files.push(File::new(
+            ".".to_string(),
+            current_metadata,
+            check_extended_attributes(current_folder),
+        ));
+        files.push(File::new(
+            "..".to_string(),
+            parent_metadata,
+            check_extended_attributes(parent_folder),
+        ));
     }
     for path in paths {
         match path {
             Ok(path) => {
                 let metadata = path.metadata().unwrap();
-                files.push(File::new(get_path_name(path.path()), metadata));
+                files.push(File::new(
+                    get_path_name(path.path()),
+                    metadata,
+                    check_extended_attributes(&path.path()),
+                ));
             }
             Err(error_message) => println!("{}", error_message),
         }
@@ -35,9 +67,17 @@ fn create_files_vector(paths: ReadDir, parameters: &Parameters) -> Vec<File> {
     insert_path_in_vector(paths, &mut files, parameters);
 
     if parameters.reverse_order == true {
-        reverse_alphabetically_rank_files(&mut files);
+        if parameters.last_modified_order == true {
+            reverse_rank_files_by_last_modified_date(&mut files);
+        } else {
+            reverse_alphabetically_rank_files(&mut files);
+        }
     } else {
-        alphabetically_rank_files(&mut files);
+        if parameters.last_modified_order == true {
+            rank_files_by_last_modified_date(&mut files);
+        } else {
+            alphabetically_rank_files(&mut files);
+        }
     }
 
     return files;
@@ -48,9 +88,117 @@ fn handle_single_arguments(target_path: &str, parameters: &Parameters) {
         println!("{}", target_path);
     } else {
         match one_argument(target_path, parameters) {
-            Ok(files) => simple_print(files, parameters),
+            Ok(files) => {
+                if parameters.long_format == true {
+                    long_format_print(files, parameters)
+                } else {
+                    simple_print(files, parameters)
+                }
+            }
             Err(error_message) => println!("{}", error_message),
         }
+    }
+}
+
+fn file_type(file: &File) -> String {
+    if file.is_dir == true {
+        String::from("d")
+    } else if file.is_symbolic_link == true {
+        String::from("l")
+    } else {
+        String::from("-")
+    }
+}
+
+fn permission_bits(mode: u32, read: u32, write: u32, execute: u32) -> String {
+    let r = if mode & read != 0 { "r" } else { "-" };
+    let w = if mode & write != 0 { "w" } else { "-" };
+    let x = if mode & execute != 0 { "x" } else { "-" };
+
+    format!("{}{}{}", r, w, x)
+}
+
+fn get_longest_number_of_links(files: &Vec<File>) -> usize {
+    let mut longest_number = 1;
+
+    for i in files {
+        if i.number_of_links.to_string().len() > longest_number {
+            longest_number = i.number_of_links.to_string().len();
+        }
+    }
+    longest_number
+}
+
+fn get_longest_file_size(files: &Vec<File>) -> usize {
+    let mut longest_file_size = 1;
+
+    for i in files {
+        if i.number_of_bytes.to_string().len() > longest_file_size {
+            longest_file_size = i.number_of_bytes.to_string().len();
+        }
+    }
+    longest_file_size
+}
+
+fn get_total_number_of_blocks(files: &Vec<File>) -> u64 {
+    let mut total_number_of_blocks = 0;
+
+    for i in files {
+        total_number_of_blocks += i.blocks;
+    }
+    total_number_of_blocks
+}
+
+fn long_format_print(mut files: Vec<File>, parameters: &Parameters) {
+    // Remove all the files where the name starts with a dot, if the -a parameter was not included.
+    if parameters.include_dot_files == false {
+        files.retain(|file| !file.path_name.starts_with('.'));
+    }
+
+    let longest_number = get_longest_number_of_links(&files);
+    let longest_file_size = get_longest_file_size(&files);
+
+    println!("total {}", get_total_number_of_blocks(&files));
+
+    for file in files {
+        let mode = file.file_mode.mode();
+
+        // Print the file permissions in the format of the "ls -l" command
+        print!("{}", file_type(&file));
+        print!("{}", permission_bits(mode, 0o400, 0o200, 0o100));
+        print!("{}", permission_bits(mode, 0o040, 0o020, 0o010));
+        print!("{}", permission_bits(mode, 0o004, 0o002, 0o001));
+        if file.extended_attributes == true {
+            print!("@ ");
+        } else {
+            print!("  ");
+        }
+        let mut spacing = longest_number - file.number_of_links.to_string().len();
+        while spacing > 0 {
+            print!(" ");
+            spacing -= 1;
+        }
+        print!("{} ", file.number_of_links);
+        print!("{}  ", file.owner_name);
+        print!("{}  ", file.group_name);
+
+        let mut spacing = longest_file_size - file.number_of_bytes.to_string().len();
+        while spacing > 0 {
+            print!(" ");
+            spacing -= 1;
+        }
+        print!("{} ", file.number_of_bytes);
+        let datetime: DateTime<Local> = file.last_modified.into();
+        let formatted = datetime.format("%b %e %H:%M").to_string();
+        print!("{} ", formatted);
+        print!("{}", color_print(&file));
+        if file.is_symbolic_link == true {
+            print!(
+                " -> {}",
+                read_link(file.path_name).unwrap().to_str().unwrap()
+            );
+        }
+        println!();
     }
 }
 
@@ -82,8 +230,15 @@ fn handle_multiple_arguments(args: Vec<String>, parameters: &Parameters) {
         } else {
             match one_argument(&args[counter], parameters) {
                 Ok(files) => {
-                    println!("{}:", &args[counter]);
-                    simple_print(files, parameters);
+                    print!("{}:", &args[counter]);
+                    if !files.is_empty() {
+                        println!();
+                    }
+                    if parameters.long_format == true {
+                        long_format_print(files, parameters);
+                    } else {
+                        simple_print(files, parameters);
+                    }
                     if counter != args.len() - 1 {
                         println!();
                     }
@@ -114,6 +269,10 @@ fn parse_parameters(args: &mut Vec<String>) -> Parameters {
         parameters.reverse_order = true;
     }
 
+    if args[0].contains("t") {
+        parameters.last_modified_order = true;
+    }
+
     if args[0].contains("R") {
         parameters.recursive_listing = true;
     }
@@ -138,7 +297,13 @@ pub fn handle_command() {
     let empty_single_files = handle_single_files(&mut args, &parameters);
 
     if parameters.reverse_order == true {
-        reverse_alphabetically_rank_strings(&mut args);
+        if parameters.last_modified_order == true {
+            reverse_rank_path_by_last_modified_date(&mut args);
+        } else {
+            reverse_alphabetically_rank_strings(&mut args);
+        }
+    } else if parameters.last_modified_order == true {
+        rank_path_by_last_modified_date(&mut args);
     }
 
     if !args.is_empty() {
@@ -155,6 +320,10 @@ pub fn handle_command() {
 fn color_print(file: &File) -> ColoredString {
     if file.is_dir == true {
         return format!("{}", file.path_name).cyan().bold();
+    } else if file.is_symbolic_link == true {
+        return format!("{}", file.path_name).purple();
+    } else if is_executable(file) == true {
+        return format!("{}", file.path_name).red();
     } else {
         return format!("{}", file.path_name).white();
     }
@@ -179,6 +348,10 @@ pub fn simple_print(mut files: Vec<File>, parameters: &Parameters) {
     // Remove all the files where the name starts with a dot, if the -a parameter was not included.
     if parameters.include_dot_files == false {
         files.retain(|file| !file.path_name.starts_with('.'));
+    }
+    if files.is_empty() {
+        println!();
+        return;
     }
     let column_length = get_column_length(&files);
     let (number_of_rows, number_of_columns) =

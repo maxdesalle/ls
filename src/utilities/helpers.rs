@@ -1,6 +1,64 @@
 use crate::File;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use terminal_size::{terminal_size, Width};
+
+// Orders a vector of File objects in descending order based on the last modified date.
+pub fn rank_files_by_last_modified_date(files: &mut Vec<File>) {
+    files.sort_unstable_by(|a, b| b.last_modified.partial_cmp(&a.last_modified).unwrap());
+}
+
+// Orders a vector of File objects in ascending order based on the last modified date.
+pub fn reverse_rank_files_by_last_modified_date(files: &mut Vec<File>) {
+    files.sort_unstable_by(|a, b| a.last_modified.partial_cmp(&b.last_modified).unwrap());
+}
+
+// Orders a vector of paths in descending order based on the last modified date.
+// pub fn rank_path_by_last_modified_date(files: &mut Vec<String>) {
+//     let mut metadata: Vec<Metadata> = Vec::new();
+
+//     for i in files {
+//         metadata.push(Path::new(i).metadata().unwrap());
+//     }
+//     metadata.sort_unstable_by(|a, b| {
+//         b.modified()
+//             .unwrap()
+//             .partial_cmp(&a.modified().unwrap())
+//             .unwrap()
+//     });
+// }
+// Orders a vector of File objects in ascending order based on the last modified date.
+pub fn rank_path_by_last_modified_date(files: &mut Vec<String>) {
+    files.sort_unstable_by(|a, b| {
+        (Path::new(b).metadata().unwrap().modified().unwrap())
+            .partial_cmp(&Path::new(&a).metadata().unwrap().modified().unwrap())
+            .unwrap()
+    });
+}
+
+// Orders a vector of File objects in ascending order based on the last modified date.
+pub fn reverse_rank_path_by_last_modified_date(files: &mut Vec<String>) {
+    files.sort_unstable_by(|a, b| {
+        (Path::new(a).metadata().unwrap().modified().unwrap())
+            .partial_cmp(&Path::new(&b).metadata().unwrap().modified().unwrap())
+            .unwrap()
+    });
+}
+
+// // Orders a vector of paths in ascending order based on the last modified date.
+// pub fn reverse_rank_path_by_last_modified_date(files: &mut Vec<String>) {
+//     let mut metadata: Vec<Metadata> = Vec::new();
+
+//     for i in files {
+//         metadata.push(Path::new(i).metadata().unwrap());
+//     }
+//     metadata.sort_unstable_by(|a, b| {
+//         a.modified()
+//             .unwrap()
+//             .partial_cmp(&b.modified().unwrap())
+//             .unwrap()
+//     });
+// }
 
 // Orders a vector of File objects alphabetically based on their path_name variable.
 pub fn alphabetically_rank_files(files: &mut Vec<File>) {
@@ -54,6 +112,10 @@ pub fn get_terminal_width() -> Result<u16, String> {
 // Returns the length of the longest path name in the "files" vector, adding 1 for spacing.
 pub fn get_column_length_single_files(files: &Vec<String>) -> usize {
     files.iter().max_by_key(|file| file.len()).unwrap().len() + 1
+}
+
+pub fn is_executable(file: &File) -> bool {
+    file.file_mode.mode() & 0o111 != 0
 }
 
 // Returns the length of the longest path name in the "files" vector, adding 1 for spacing.

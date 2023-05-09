@@ -8,3 +8,8 @@ edition = "2021"
 [dependencies]
 colored = "2"
 terminal_size = "0.2.6"
+xattr = "0.2.2"
+users = "0.11.0"
+chrono = "0.4"
+acl-sys = "1.2.2"
+libc = "0.2.144"
