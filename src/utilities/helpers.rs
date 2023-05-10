@@ -13,20 +13,6 @@ pub fn reverse_rank_files_by_last_modified_date(files: &mut Vec<File>) {
     files.sort_unstable_by(|a, b| a.last_modified.partial_cmp(&b.last_modified).unwrap());
 }
 
-// Orders a vector of paths in descending order based on the last modified date.
-// pub fn rank_path_by_last_modified_date(files: &mut Vec<String>) {
-//     let mut metadata: Vec<Metadata> = Vec::new();
-
-//     for i in files {
-//         metadata.push(Path::new(i).metadata().unwrap());
-//     }
-//     metadata.sort_unstable_by(|a, b| {
-//         b.modified()
-//             .unwrap()
-//             .partial_cmp(&a.modified().unwrap())
-//             .unwrap()
-//     });
-// }
 // Orders a vector of File objects in ascending order based on the last modified date.
 pub fn rank_path_by_last_modified_date(files: &mut Vec<String>) {
     files.sort_unstable_by(|a, b| {
@@ -44,21 +30,6 @@ pub fn reverse_rank_path_by_last_modified_date(files: &mut Vec<String>) {
             .unwrap()
     });
 }
-
-// // Orders a vector of paths in ascending order based on the last modified date.
-// pub fn reverse_rank_path_by_last_modified_date(files: &mut Vec<String>) {
-//     let mut metadata: Vec<Metadata> = Vec::new();
-
-//     for i in files {
-//         metadata.push(Path::new(i).metadata().unwrap());
-//     }
-//     metadata.sort_unstable_by(|a, b| {
-//         a.modified()
-//             .unwrap()
-//             .partial_cmp(&b.modified().unwrap())
-//             .unwrap()
-//     });
-// }
 
 // Orders a vector of File objects alphabetically based on their path_name variable.
 pub fn alphabetically_rank_files(files: &mut Vec<File>) {

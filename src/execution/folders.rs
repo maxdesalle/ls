@@ -24,27 +24,32 @@ fn check_extended_attributes(path: &Path) -> bool {
     }
 }
 
+fn insert_dot_files_in_vector(files: &mut Vec<File>) {
+    let current_folder = Path::new(".");
+    let parent_folder = Path::new("..");
+
+    let current_metadata = current_folder.metadata().unwrap();
+    let parent_metadata = parent_folder.metadata().unwrap();
+
+    files.push(File::new(
+        ".".to_string(),
+        current_metadata,
+        check_extended_attributes(current_folder),
+    ));
+    files.push(File::new(
+        "..".to_string(),
+        parent_metadata,
+        check_extended_attributes(parent_folder),
+    ));
+}
+
 // Assembles the vector returned in create_files_vector() by filling each File object with the
 // given metadata.
 fn insert_path_in_vector(paths: ReadDir, files: &mut Vec<File>, parameters: &Parameters) {
     if parameters.include_dot_files == true {
-        let current_folder = Path::new(".");
-        let parent_folder = Path::new("..");
-
-        let current_metadata = current_folder.metadata().unwrap();
-        let parent_metadata = parent_folder.metadata().unwrap();
-
-        files.push(File::new(
-            ".".to_string(),
-            current_metadata,
-            check_extended_attributes(current_folder),
-        ));
-        files.push(File::new(
-            "..".to_string(),
-            parent_metadata,
-            check_extended_attributes(parent_folder),
-        ));
+        insert_dot_files_in_vector(files);
     }
+
     for path in paths {
         match path {
             Ok(path) => {
@@ -149,6 +154,53 @@ fn get_total_number_of_blocks(files: &Vec<File>) -> u64 {
     total_number_of_blocks
 }
 
+fn print_permissions(file: &File) {
+    let mode = file.file_mode.mode();
+
+    // Print the file permissions in the format of the "ls -l" command
+    print!("{}", file_type(&file));
+    print!("{}", permission_bits(mode, 0o400, 0o200, 0o100));
+    print!("{}", permission_bits(mode, 0o040, 0o020, 0o010));
+    print!("{}", permission_bits(mode, 0o004, 0o002, 0o001));
+
+    if file.extended_attributes == true {
+        print!("@ ");
+    } else {
+        print!("  ");
+    }
+}
+
+fn print_spacing_difference(number_one: usize, number_two: usize) {
+    let mut spacing = number_one - number_two;
+
+    while spacing > 0 {
+        print!(" ");
+        spacing -= 1;
+    }
+}
+
+fn get_symbolic_link(file: &File) -> String {
+    read_link(&file.path_name)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string()
+}
+
+fn print_file_name_long_format(file: &File) {
+    print!("{}", color_print(&file));
+    if file.is_symbolic_link == true {
+        print!(" -> {}", get_symbolic_link(file));
+    }
+    println!();
+}
+
+fn print_date_long_format(file: &File) {
+    let datetime: DateTime<Local> = file.last_modified.into();
+    let formatted = datetime.format("%b %e %H:%M").to_string();
+    print!("{} ", formatted);
+}
+
 fn long_format_print(mut files: Vec<File>, parameters: &Parameters) {
     // Remove all the files where the name starts with a dot, if the -a parameter was not included.
     if parameters.include_dot_files == false {
@@ -161,44 +213,17 @@ fn long_format_print(mut files: Vec<File>, parameters: &Parameters) {
     println!("total {}", get_total_number_of_blocks(&files));
 
     for file in files {
-        let mode = file.file_mode.mode();
+        print_permissions(&file);
+        print_spacing_difference(longest_number, file.number_of_links.to_string().len());
 
-        // Print the file permissions in the format of the "ls -l" command
-        print!("{}", file_type(&file));
-        print!("{}", permission_bits(mode, 0o400, 0o200, 0o100));
-        print!("{}", permission_bits(mode, 0o040, 0o020, 0o010));
-        print!("{}", permission_bits(mode, 0o004, 0o002, 0o001));
-        if file.extended_attributes == true {
-            print!("@ ");
-        } else {
-            print!("  ");
-        }
-        let mut spacing = longest_number - file.number_of_links.to_string().len();
-        while spacing > 0 {
-            print!(" ");
-            spacing -= 1;
-        }
         print!("{} ", file.number_of_links);
         print!("{}  ", file.owner_name);
         print!("{}  ", file.group_name);
 
-        let mut spacing = longest_file_size - file.number_of_bytes.to_string().len();
-        while spacing > 0 {
-            print!(" ");
-            spacing -= 1;
-        }
+        print_spacing_difference(longest_file_size, file.number_of_bytes.to_string().len());
         print!("{} ", file.number_of_bytes);
-        let datetime: DateTime<Local> = file.last_modified.into();
-        let formatted = datetime.format("%b %e %H:%M").to_string();
-        print!("{} ", formatted);
-        print!("{}", color_print(&file));
-        if file.is_symbolic_link == true {
-            print!(
-                " -> {}",
-                read_link(file.path_name).unwrap().to_str().unwrap()
-            );
-        }
-        println!();
+        print_date_long_format(&file);
+        print_file_name_long_format(&file);
     }
 }
 
@@ -213,6 +238,14 @@ fn handle_folders(args: Vec<String>, multiple_arguments: bool, parameters: &Para
             handle_single_arguments(&args[counter], parameters);
         }
     } else {
+    }
+}
+
+fn print_format_redirect(files: Vec<File>, parameters: &Parameters) {
+    if parameters.long_format == true {
+        long_format_print(files, parameters);
+    } else {
+        simple_print(files, parameters);
     }
 }
 
@@ -234,11 +267,7 @@ fn handle_multiple_arguments(args: Vec<String>, parameters: &Parameters) {
                     if !files.is_empty() {
                         println!();
                     }
-                    if parameters.long_format == true {
-                        long_format_print(files, parameters);
-                    } else {
-                        simple_print(files, parameters);
-                    }
+                    print_format_redirect(files, parameters);
                     if counter != args.len() - 1 {
                         println!();
                     }
@@ -285,6 +314,20 @@ fn parse_parameters(args: &mut Vec<String>) -> Parameters {
     return parameters;
 }
 
+fn check_parameters(parameters: &Parameters, mut args: Vec<String>) -> Vec<String> {
+    if parameters.reverse_order == true {
+        if parameters.last_modified_order == true {
+            reverse_rank_path_by_last_modified_date(&mut args);
+        } else {
+            reverse_alphabetically_rank_strings(&mut args);
+        }
+    } else if parameters.last_modified_order == true {
+        rank_path_by_last_modified_date(&mut args);
+    }
+
+    args
+}
+
 // Handles both commands with multiple arguments but without parameters, and vice-versa.
 pub fn handle_command() {
     let mut args: Vec<String> = env::args().collect();
@@ -296,15 +339,7 @@ pub fn handle_command() {
     handle_unexisting_files(&mut args);
     let empty_single_files = handle_single_files(&mut args, &parameters);
 
-    if parameters.reverse_order == true {
-        if parameters.last_modified_order == true {
-            reverse_rank_path_by_last_modified_date(&mut args);
-        } else {
-            reverse_alphabetically_rank_strings(&mut args);
-        }
-    } else if parameters.last_modified_order == true {
-        rank_path_by_last_modified_date(&mut args);
-    }
+    args = check_parameters(&parameters, args);
 
     if !args.is_empty() {
         if empty_single_files == true {
