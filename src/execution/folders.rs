@@ -6,6 +6,7 @@ use std::fs::read_link;
 use std::fs::{read_dir, ReadDir};
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
+use std::path::PathBuf;
 use xattr;
 
 fn check_extended_attributes(path: &Path) -> bool {
@@ -55,7 +56,7 @@ fn insert_path_in_vector(paths: ReadDir, files: &mut Vec<File>, parameters: &Par
             Ok(path) => {
                 let metadata = path.metadata().unwrap();
                 files.push(File::new(
-                    get_path_name(path.path()),
+                    get_path_name(&path.path()),
                     metadata,
                     check_extended_attributes(&path.path()),
                 ));
@@ -231,14 +232,13 @@ fn long_format_print(mut files: Vec<File>, parameters: &Parameters) {
 fn handle_folders(args: Vec<String>, multiple_arguments: bool, parameters: &Parameters) {
     let counter = 0;
 
-    if args[0].chars().nth(0).unwrap() != '-' {
-        if args.len() > 1 || multiple_arguments == true {
-            handle_multiple_arguments(args, parameters);
-        } else {
-            handle_single_arguments(&args[counter], parameters);
-        }
+    // if args[0].chars().nth(0).unwrap() != '-' {
+    if args.len() > 1 || multiple_arguments == true {
+        handle_multiple_arguments(args, parameters);
     } else {
+        handle_single_arguments(&args[counter], parameters);
     }
+    // }
 }
 
 fn print_format_redirect(files: Vec<File>, parameters: &Parameters) {
@@ -328,15 +328,99 @@ fn check_parameters(parameters: &Parameters, mut args: Vec<String>) -> Vec<Strin
     args
 }
 
+fn directory_traversal(path: &PathBuf, parameters: &Parameters) -> Vec<PathBuf> {
+    let mut directories: Vec<PathBuf> = Vec::new();
+    // let directory = read_dir(path).unwrap();
+    let mut directory: Vec<PathBuf> = read_dir(path)
+        .unwrap()
+        .map(|res| res.map(|e| e.path()))
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+
+    if parameters.reverse_order == true {
+        if parameters.last_modified_order == true {
+            reverse_rank_path_bufs_by_last_modified_date(&mut directory);
+        } else {
+            reverse_alphabetically_rank_path_bufs(&mut directory);
+        }
+    } else if parameters.last_modified_order == true {
+        rank_path_bufs_by_last_modified_date(&mut directory);
+    } else {
+        alphabetically_rank_path_bufs(&mut directory);
+    }
+
+    for entry in directory {
+        if entry.is_dir() && !(get_path_name(&entry).starts_with('.')) {
+            // println!("{}", entry.file_name().unwrap().to_str().unwrap());
+            directories.push(entry.clone());
+            directories.append(&mut directory_traversal(&entry, &parameters));
+        }
+    }
+    return directories;
+}
+
+fn handle_recursivity(args: &mut Vec<String>, parameters: &Parameters) {
+    let mut directories: Vec<PathBuf> = Vec::new();
+    let mut single_files: Vec<File> = Vec::new();
+    let number_of_arguments = args.len();
+
+    alphabetically_rank_strings(args);
+
+    if handle_single_files(args, parameters) == false {
+        println!();
+    }
+
+    for i in &mut *args {
+        let path = Path::new(&i);
+        if path.is_dir() {
+            if number_of_arguments > 1 {
+                directories.push(path.to_path_buf());
+            }
+            directories.append(&mut directory_traversal(&path.to_path_buf(), &parameters));
+        } else {
+            single_files.push(File::new(
+                get_path_name(&path.to_path_buf()),
+                path.metadata().unwrap(),
+                check_extended_attributes(&path),
+            ));
+        }
+    }
+
+    // println!("{:?}", directories);
+
+    if args.len() == 1 {
+        match one_argument(&args[0], &parameters) {
+            Ok(mut files) => {
+                files.append(&mut single_files);
+                simple_print(files, &parameters);
+            }
+            Err(error_message) => println!("{}", error_message),
+        }
+        if !directories.is_empty() {
+            println!();
+        }
+    }
+
+    handle_folders(
+        convert_path_buf_vector_to_string_vector(&directories),
+        true,
+        parameters,
+    );
+}
+
 // Handles both commands with multiple arguments but without parameters, and vice-versa.
-pub fn handle_command() {
-    let mut args: Vec<String> = env::args().collect();
+pub fn handle_command(mut args: Vec<String>) {
+    // let mut args: Vec<String> = env::args().collect();
 
     args.remove(0);
 
     let parameters = parse_parameters(&mut args);
-
     handle_unexisting_files(&mut args);
+
+    if parameters.recursive_listing == true {
+        return handle_recursivity(&mut args, &parameters);
+    }
+
     let empty_single_files = handle_single_files(&mut args, &parameters);
 
     args = check_parameters(&parameters, args);

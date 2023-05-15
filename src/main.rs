@@ -19,6 +19,6 @@ fn main() {
             Err(error_message) => println!("{}", error_message),
         }
     } else {
-        handle_command();
+        handle_command(env::args().collect());
     }
 }

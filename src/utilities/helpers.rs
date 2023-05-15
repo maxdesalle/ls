@@ -51,6 +51,30 @@ pub fn reverse_alphabetically_rank_strings(strings: &mut Vec<String>) {
     strings.sort_unstable_by(|a, b| b.partial_cmp(a).unwrap());
 }
 
+pub fn alphabetically_rank_path_bufs(paths: &mut Vec<PathBuf>) {
+    paths.sort_unstable_by(|a, b| get_path_name(a).partial_cmp(&get_path_name(b)).unwrap());
+}
+
+pub fn reverse_alphabetically_rank_path_bufs(paths: &mut Vec<PathBuf>) {
+    paths.sort_unstable_by(|a, b| get_path_name(b).partial_cmp(&get_path_name(a)).unwrap());
+}
+
+pub fn rank_path_bufs_by_last_modified_date(paths: &mut Vec<PathBuf>) {
+    paths.sort_unstable_by(|a, b| {
+        (b.metadata().unwrap().modified().unwrap())
+            .partial_cmp(&a.metadata().unwrap().modified().unwrap())
+            .unwrap()
+    });
+}
+
+pub fn reverse_rank_path_bufs_by_last_modified_date(paths: &mut Vec<PathBuf>) {
+    paths.sort_unstable_by(|a, b| {
+        (a.metadata().unwrap().modified().unwrap())
+            .partial_cmp(&b.metadata().unwrap().modified().unwrap())
+            .unwrap()
+    });
+}
+
 // Checks if the path points to a file or a directory.
 pub fn is_file(target_path: &str) -> bool {
     let path = Path::new(target_path);
@@ -80,6 +104,16 @@ pub fn get_terminal_width() -> Result<u16, String> {
     }
 }
 
+pub fn convert_path_buf_vector_to_string_vector(pathbufs: &Vec<PathBuf>) -> Vec<String> {
+    let filenames: Vec<String> = pathbufs
+        .iter()
+        .filter_map(|path| path.to_str())
+        .map(|str| str.to_owned())
+        .collect();
+
+    filenames
+}
+
 // Returns the length of the longest path name in the "files" vector, adding 1 for spacing.
 pub fn get_column_length_single_files(files: &Vec<String>) -> usize {
     files.iter().max_by_key(|file| file.len()).unwrap().len() + 1
@@ -100,7 +134,7 @@ pub fn get_column_length(files: &Vec<File>) -> usize {
         + 1
 }
 
-pub fn get_path_name(path: PathBuf) -> String {
+pub fn get_path_name(path: &PathBuf) -> String {
     path.file_name()
         .unwrap()
         .to_os_string()
