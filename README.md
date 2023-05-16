@@ -28,7 +28,7 @@ Here are a few command examples:
 - The following parameters are supported: `-a`, `-l`, `-r`, `-t` and `-R`.
 - Only tested on MacOS.
 - The output should look **exactly** like the actual command's output looks like, with a couple (very) minor differences.
-- This is not meant to be used in production, but should normally work as intended (at least according to the included tests).
+- This is not meant to be used in production, but should normally work as intended (at least according to the testing that was made).
 - Each function has a comment explaining its use.
 - The focus is on short and modular functions, to avoid spaghetti code.
 

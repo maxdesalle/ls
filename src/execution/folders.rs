@@ -317,31 +317,31 @@ fn handle_multiple_arguments(args: Vec<String>, parameters: &Parameters) {
 fn parse_parameters(args: &mut Vec<String>) -> Parameters {
     let mut parameters = Parameters::new();
 
-    if !args[0].starts_with("-") {
-        return parameters;
+    for i in &mut *args {
+        if i.starts_with('-') {
+            if i.contains("a") {
+                parameters.include_dot_files = true;
+            }
+
+            if i.contains("l") {
+                parameters.long_format = true;
+            }
+
+            if i.contains("r") {
+                parameters.reverse_order = true;
+            }
+
+            if i.contains("t") {
+                parameters.last_modified_order = true;
+            }
+
+            if i.contains("R") {
+                parameters.recursive_listing = true;
+            }
+        }
     }
 
-    if args[0].contains("a") {
-        parameters.include_dot_files = true;
-    }
-
-    if args[0].contains("l") {
-        parameters.long_format = true;
-    }
-
-    if args[0].contains("r") {
-        parameters.reverse_order = true;
-    }
-
-    if args[0].contains("t") {
-        parameters.last_modified_order = true;
-    }
-
-    if args[0].contains("R") {
-        parameters.recursive_listing = true;
-    }
-
-    args.remove(0);
+    args.retain(|s| !s.starts_with('-'));
     if args.is_empty() {
         args.push("./".to_string());
     }
