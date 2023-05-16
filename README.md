@@ -1,17 +1,36 @@
 # ls
-A clean implementation of the `ls` command, built in Rust.
+An implementation of the `ls` command, in Rust.
 
 ## Using it
-To start the shell, execute the following command:
+To build the project, execute the following command:
 ```bash
-cargo run <parameters> <arguments>
+cargo build
 ```
 
-Here is an example of a command:
+Once built, move the executable to the root of the directory.
 ```bash
-cargo run -laR .
+mv ./target/debug/ls .
 ```
+
+Afterwards, you can find the executable in the `./target/debug/` folder, and use it as you wish:
+```bash
+./ls <parameters> <arguments>
+```
+
+Here are a few command examples:
+```bash
+./ls -lraRt .
+./ls -lr <first file> <second file>
+./ls -aR this_file_does_not_exist
+```
+
+## Notes
+- The following parameters are supported: `-a`, `-l`, `-r`, `-t` and `-R`.
+- Only tested on MacOS.
+- The output should look **exactly** like the actual command's output looks like, with a couple (very) minor differences.
+- This is not meant to be used in production, but should normally work as intended (at least according to the included tests).
+- Each function has a comment explaining its use.
+- The focus is on short and modular functions, to avoid spaghetti code.
 
 ## License
-
 This repository is released under the [MIT License](https://github.com/maxdesalle/ls/blob/main/LICENSE).
