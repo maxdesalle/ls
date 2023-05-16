@@ -97,13 +97,35 @@ pub fn handle_single_files(args: &mut Vec<String>, parameters: &Parameters) -> b
     remove_single_files(args, &mut single_files);
 
     if parameters.reverse_order == true {
-        reverse_alphabetically_rank_strings(&mut single_files);
+        if parameters.last_modified_order == true {
+            reverse_rank_path_by_last_modified_date(&mut single_files);
+        } else {
+            reverse_alphabetically_rank_strings(&mut single_files);
+        }
     } else {
-        alphabetically_rank_strings(&mut single_files);
+        if parameters.last_modified_order == true {
+            rank_path_by_last_modified_date(&mut single_files);
+        } else {
+            alphabetically_rank_strings(&mut single_files);
+        }
     }
 
+    // if parameters.reverse_order == true {
+    //     reverse_alphabetically_rank_strings(&mut single_files);
+    // } else {
+    //     alphabetically_rank_strings(&mut single_files);
+    // }
+
     if !single_files.is_empty() {
-        simple_print_single_files(&single_files);
+        if parameters.long_format == true {
+            long_format_print(
+                convert_string_vector_to_file_vector(single_files),
+                parameters,
+                true,
+            );
+        } else {
+            simple_print_single_files(&single_files);
+        }
         return false;
     }
     return true;

@@ -1,7 +1,6 @@
 use crate::*;
 use chrono::{DateTime, Local};
 use colored::{ColoredString, Colorize};
-use std::env;
 use std::fs::read_link;
 use std::fs::{read_dir, ReadDir};
 use std::os::unix::fs::PermissionsExt;
@@ -9,7 +8,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use xattr;
 
-fn check_extended_attributes(path: &Path) -> bool {
+pub fn check_extended_attributes(path: &Path) -> bool {
     match xattr::list(path) {
         Ok(attributes) => {
             if attributes.peekable().peek().is_none() {
@@ -96,7 +95,7 @@ fn handle_single_arguments(target_path: &str, parameters: &Parameters) {
         match one_argument(target_path, parameters) {
             Ok(files) => {
                 if parameters.long_format == true {
-                    long_format_print(files, parameters)
+                    long_format_print(files, parameters, false)
                 } else {
                     simple_print(files, parameters)
                 }
@@ -202,7 +201,7 @@ fn print_date_long_format(file: &File) {
     print!("{} ", formatted);
 }
 
-fn long_format_print(mut files: Vec<File>, parameters: &Parameters) {
+pub fn long_format_print(mut files: Vec<File>, parameters: &Parameters, single_files: bool) {
     // Remove all the files where the name starts with a dot, if the -a parameter was not included.
     if parameters.include_dot_files == false {
         files.retain(|file| !file.path_name.starts_with('.'));
@@ -211,7 +210,9 @@ fn long_format_print(mut files: Vec<File>, parameters: &Parameters) {
     let longest_number = get_longest_number_of_links(&files);
     let longest_file_size = get_longest_file_size(&files);
 
-    println!("total {}", get_total_number_of_blocks(&files));
+    if single_files == false {
+        println!("total {}", get_total_number_of_blocks(&files));
+    }
 
     for file in files {
         print_permissions(&file);
@@ -243,7 +244,7 @@ fn handle_folders(args: Vec<String>, multiple_arguments: bool, parameters: &Para
 
 fn print_format_redirect(files: Vec<File>, parameters: &Parameters) {
     if parameters.long_format == true {
-        long_format_print(files, parameters);
+        long_format_print(files, parameters, false);
     } else {
         simple_print(files, parameters);
     }
@@ -366,7 +367,7 @@ fn handle_recursivity(args: &mut Vec<String>, parameters: &Parameters) {
 
     alphabetically_rank_strings(args);
 
-    if handle_single_files(args, parameters) == false {
+    if handle_single_files(args, parameters) == false && !args.is_empty() {
         println!();
     }
 
@@ -392,7 +393,11 @@ fn handle_recursivity(args: &mut Vec<String>, parameters: &Parameters) {
         match one_argument(&args[0], &parameters) {
             Ok(mut files) => {
                 files.append(&mut single_files);
-                simple_print(files, &parameters);
+                if parameters.long_format == true {
+                    long_format_print(files, parameters, false);
+                } else {
+                    simple_print(files, &parameters);
+                }
             }
             Err(error_message) => println!("{}", error_message),
         }

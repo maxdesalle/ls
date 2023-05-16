@@ -1,4 +1,4 @@
-use crate::File;
+use crate::*;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use terminal_size::{terminal_size, Width};
@@ -112,6 +112,22 @@ pub fn convert_path_buf_vector_to_string_vector(pathbufs: &Vec<PathBuf>) -> Vec<
         .collect();
 
     filenames
+}
+
+pub fn convert_string_vector_to_file_vector(strings: Vec<String>) -> Vec<File> {
+    let files: Vec<File> = strings
+        .into_iter()
+        .map(|string| {
+            let path = Path::new(&string);
+            File::new(
+                path.file_name().unwrap().to_str().unwrap().to_owned(),
+                path.metadata().unwrap(),
+                check_extended_attributes(&path),
+            )
+        })
+        .collect();
+
+    files
 }
 
 // Returns the length of the longest path name in the "files" vector, adding 1 for spacing.
