@@ -437,7 +437,8 @@ fn handle_recursivity(args: &mut Vec<String>, parameters: &Parameters) {
     alphabetically_rank_strings(args);
 
     // Handles specific files mentioned as arguments in the command.
-    if handle_single_files(args, parameters) == false && !args.is_empty() {
+    let do_single_files_not_exist = handle_single_files(args, parameters);
+    if do_single_files_not_exist == false && args.is_empty() == false {
         println!();
     }
 
@@ -446,6 +447,9 @@ fn handle_recursivity(args: &mut Vec<String>, parameters: &Parameters) {
     // If there is only one argument that is a folder, print its content first before the recursive
     // output.
     if args.len() == 1 {
+        if do_single_files_not_exist == false {
+            println!("{}:", &args[0]);
+        }
         include_root_files(&mut single_files, &args[0], parameters);
         if !directories.is_empty() {
             println!();

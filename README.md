@@ -1,6 +1,10 @@
 # ls
 An implementation of the `ls` command, in Rust.
 
+<p align="center">
+<img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExYzgwMjkxNWExMmI0YWMyMDEzOTQ5NWU3NDE0YjQ5MGEwMzlkOGU1OSZlcD12MV9pbnRlcm5hbF9naWZzX2dpZklkJmN0PWc/Idi0rO80vvpgSEJtLw/giphy.gif" width="65%" />
+</p>
+
 ## Using it
 To build the project, execute the following command:
 ```bash
