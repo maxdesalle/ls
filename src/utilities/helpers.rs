@@ -1,4 +1,5 @@
 use crate::*;
+use std::fs::read_link;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use terminal_size::{terminal_size, Width};
@@ -51,14 +52,17 @@ pub fn reverse_alphabetically_rank_strings(strings: &mut Vec<String>) {
     strings.sort_unstable_by(|a, b| b.partial_cmp(a).unwrap());
 }
 
+// Alphabetically ranks a vector of PathBuf objects.
 pub fn alphabetically_rank_path_bufs(paths: &mut Vec<PathBuf>) {
     paths.sort_unstable_by(|a, b| get_path_name(a).partial_cmp(&get_path_name(b)).unwrap());
 }
 
+// Alphabetically ranks a vector in reverse of PathBuf objects.
 pub fn reverse_alphabetically_rank_path_bufs(paths: &mut Vec<PathBuf>) {
     paths.sort_unstable_by(|a, b| get_path_name(b).partial_cmp(&get_path_name(a)).unwrap());
 }
 
+// Ranks a vector of PathBuf objects by their last modification date.
 pub fn rank_path_bufs_by_last_modified_date(paths: &mut Vec<PathBuf>) {
     paths.sort_unstable_by(|a, b| {
         (b.metadata().unwrap().modified().unwrap())
@@ -67,6 +71,7 @@ pub fn rank_path_bufs_by_last_modified_date(paths: &mut Vec<PathBuf>) {
     });
 }
 
+// Ranks a vector of PathBuf objects in reverse by their last modification date.
 pub fn reverse_rank_path_bufs_by_last_modified_date(paths: &mut Vec<PathBuf>) {
     paths.sort_unstable_by(|a, b| {
         (a.metadata().unwrap().modified().unwrap())
@@ -89,6 +94,7 @@ pub fn file_exists(target_path: &str) -> bool {
     path.exists()
 }
 
+// Return the position in the vector of the String to look for.
 pub fn return_index_for_object(args: &mut Vec<String>, object_to_find: &String) -> usize {
     args.iter().position(|x| *x == *object_to_find).unwrap()
 }
@@ -104,6 +110,7 @@ pub fn get_terminal_width() -> Result<u16, String> {
     }
 }
 
+// Converts a vector of PathBuf objects to a vector of String objects.
 pub fn convert_path_buf_vector_to_string_vector(pathbufs: &Vec<PathBuf>) -> Vec<String> {
     let filenames: Vec<String> = pathbufs
         .iter()
@@ -114,6 +121,7 @@ pub fn convert_path_buf_vector_to_string_vector(pathbufs: &Vec<PathBuf>) -> Vec<
     filenames
 }
 
+// Converts a vector of String objects to a vector of File structs.
 pub fn convert_string_vector_to_file_vector(strings: Vec<String>) -> Vec<File> {
     let files: Vec<File> = strings
         .into_iter()
@@ -135,8 +143,18 @@ pub fn get_column_length_single_files(files: &Vec<String>) -> usize {
     files.iter().max_by_key(|file| file.len()).unwrap().len() + 1
 }
 
+// Check whether or not the given file is executable.
 pub fn is_executable(file: &File) -> bool {
     file.file_mode.mode() & 0o111 != 0
+}
+
+// Returns the file name the symbolic link is pointing towards. Used for long format printing.
+pub fn get_symbolic_link(file: &File) -> String {
+    read_link(&file.path_name)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string()
 }
 
 // Returns the length of the longest path name in the "files" vector, adding 1 for spacing.
@@ -150,6 +168,7 @@ pub fn get_column_length(files: &Vec<File>) -> usize {
         + 1
 }
 
+// Returns the file name of a given PathBuf object
 pub fn get_path_name(path: &PathBuf) -> String {
     path.file_name()
         .unwrap()

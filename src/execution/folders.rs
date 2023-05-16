@@ -1,13 +1,13 @@
 use crate::*;
 use chrono::{DateTime, Local};
 use colored::{ColoredString, Colorize};
-use std::fs::read_link;
 use std::fs::{read_dir, ReadDir};
 use std::os::unix::fs::PermissionsExt;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use xattr;
 
+// Checks whether or not the given file has extended attributes.
+// See https://en.wikipedia.org/wiki/Extended_file_attributes for more info.
 pub fn check_extended_attributes(path: &Path) -> bool {
     match xattr::list(path) {
         Ok(attributes) => {
@@ -24,6 +24,8 @@ pub fn check_extended_attributes(path: &Path) -> bool {
     }
 }
 
+// Dot files are left out by default, meaning if the include_dot_files variable is set to true in
+// the Parameters struct, they have to be "manually" included again.
 fn insert_dot_files_in_vector(files: &mut Vec<File>) {
     let current_folder = Path::new(".");
     let parent_folder = Path::new("..");
@@ -65,29 +67,53 @@ fn insert_path_in_vector(paths: ReadDir, files: &mut Vec<File>, parameters: &Par
     }
 }
 
+// Redirects to the right ranking function, based on the given parameters.
+fn file_rank_redirect(files: &mut Vec<File>, parameters: &Parameters) {
+    if parameters.reverse_order == true {
+        if parameters.last_modified_order == true {
+            reverse_rank_files_by_last_modified_date(files);
+        } else {
+            reverse_alphabetically_rank_files(files);
+        }
+    } else {
+        if parameters.last_modified_order == true {
+            rank_files_by_last_modified_date(files);
+        } else {
+            alphabetically_rank_files(files);
+        }
+    }
+}
+
+// Redirects to the right ranking function, based on the given parameters.
+fn path_buf_rank_redirect(pathbufs: &mut Vec<PathBuf>, parameters: &Parameters) {
+    if parameters.reverse_order == true {
+        if parameters.last_modified_order == true {
+            reverse_rank_path_bufs_by_last_modified_date(pathbufs);
+        } else {
+            reverse_alphabetically_rank_path_bufs(pathbufs);
+        }
+    } else {
+        if parameters.last_modified_order == true {
+            rank_path_bufs_by_last_modified_date(pathbufs);
+        } else {
+            alphabetically_rank_path_bufs(pathbufs);
+        }
+    }
+}
+
 // Returns a simple vector of File objects based on the given path.
 fn create_files_vector(paths: ReadDir, parameters: &Parameters) -> Vec<File> {
     let mut files: Vec<File> = Vec::new();
 
     insert_path_in_vector(paths, &mut files, parameters);
-
-    if parameters.reverse_order == true {
-        if parameters.last_modified_order == true {
-            reverse_rank_files_by_last_modified_date(&mut files);
-        } else {
-            reverse_alphabetically_rank_files(&mut files);
-        }
-    } else {
-        if parameters.last_modified_order == true {
-            rank_files_by_last_modified_date(&mut files);
-        } else {
-            alphabetically_rank_files(&mut files);
-        }
-    }
+    file_rank_redirect(&mut files, parameters);
 
     return files;
 }
 
+// If there is only one argument, this is the function being used.
+// Redirects to long_format_print or simple_print depending on whether or not the user wants
+// a detailed output or the simple default output.
 fn handle_single_arguments(target_path: &str, parameters: &Parameters) {
     if is_file(target_path) {
         println!("{}", target_path);
@@ -105,6 +131,7 @@ fn handle_single_arguments(target_path: &str, parameters: &Parameters) {
     }
 }
 
+// Checks the file's type, used for the long format printing.
 fn file_type(file: &File) -> String {
     if file.is_dir == true {
         String::from("d")
@@ -115,6 +142,7 @@ fn file_type(file: &File) -> String {
     }
 }
 
+// Checks the file's permissions for long format printing.
 fn permission_bits(mode: u32, read: u32, write: u32, execute: u32) -> String {
     let r = if mode & read != 0 { "r" } else { "-" };
     let w = if mode & write != 0 { "w" } else { "-" };
@@ -123,6 +151,8 @@ fn permission_bits(mode: u32, read: u32, write: u32, execute: u32) -> String {
     format!("{}{}{}", r, w, x)
 }
 
+// Finds the length of the highest number of hard links the File vector has, which is used to get
+// the right layout for the command's output for long format printing.
 fn get_longest_number_of_links(files: &Vec<File>) -> usize {
     let mut longest_number = 1;
 
@@ -134,6 +164,8 @@ fn get_longest_number_of_links(files: &Vec<File>) -> usize {
     longest_number
 }
 
+// Finds the length of the highest number for a file's size that the File vector has, which is used to get
+// the right layout for the command's output for long format printing.
 fn get_longest_file_size(files: &Vec<File>) -> usize {
     let mut longest_file_size = 1;
 
@@ -145,6 +177,7 @@ fn get_longest_file_size(files: &Vec<File>) -> usize {
     longest_file_size
 }
 
+// See https://www.gnu.org/software/coreutils/manual/html_node/Block-size.html
 fn get_total_number_of_blocks(files: &Vec<File>) -> u64 {
     let mut total_number_of_blocks = 0;
 
@@ -154,10 +187,10 @@ fn get_total_number_of_blocks(files: &Vec<File>) -> u64 {
     total_number_of_blocks
 }
 
+// Print the file permissions in the format of the "ls -l" command
 fn print_permissions(file: &File) {
     let mode = file.file_mode.mode();
 
-    // Print the file permissions in the format of the "ls -l" command
     print!("{}", file_type(&file));
     print!("{}", permission_bits(mode, 0o400, 0o200, 0o100));
     print!("{}", permission_bits(mode, 0o040, 0o020, 0o010));
@@ -170,6 +203,7 @@ fn print_permissions(file: &File) {
     }
 }
 
+// Get the right spacing in the output's layout for long format printing
 fn print_spacing_difference(number_one: usize, number_two: usize) {
     let mut spacing = number_one - number_two;
 
@@ -179,14 +213,8 @@ fn print_spacing_difference(number_one: usize, number_two: usize) {
     }
 }
 
-fn get_symbolic_link(file: &File) -> String {
-    read_link(&file.path_name)
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .to_string()
-}
-
+// Prints the file name, as well as the file it's pointing to if it's a symbolic link. Used for
+// long format printing.
 fn print_file_name_long_format(file: &File) {
     print!("{}", color_print(&file));
     if file.is_symbolic_link == true {
@@ -195,12 +223,15 @@ fn print_file_name_long_format(file: &File) {
     println!();
 }
 
+// Prints the file's last modification date in the following format: May 30 18:22.
+// Used for long format printing.
 fn print_date_long_format(file: &File) {
     let datetime: DateTime<Local> = file.last_modified.into();
     let formatted = datetime.format("%b %e %H:%M").to_string();
     print!("{} ", formatted);
 }
 
+// Called when the -l parameter is included in the command.
 pub fn long_format_print(mut files: Vec<File>, parameters: &Parameters, single_files: bool) {
     // Remove all the files where the name starts with a dot, if the -a parameter was not included.
     if parameters.include_dot_files == false {
@@ -242,6 +273,8 @@ fn handle_folders(args: Vec<String>, multiple_arguments: bool, parameters: &Para
     // }
 }
 
+// Redirects to the right type of printing, depending on whether or not the -l parameter was
+// included.
 fn print_format_redirect(files: Vec<File>, parameters: &Parameters) {
     if parameters.long_format == true {
         long_format_print(files, parameters, false);
@@ -280,6 +313,7 @@ fn handle_multiple_arguments(args: Vec<String>, parameters: &Parameters) {
     }
 }
 
+// Looks for the command's parameters and saves them in struct.
 fn parse_parameters(args: &mut Vec<String>) -> Parameters {
     let mut parameters = Parameters::new();
 
@@ -315,6 +349,7 @@ fn parse_parameters(args: &mut Vec<String>) -> Parameters {
     return parameters;
 }
 
+// Orders the arguments based on the given command parameters.
 fn check_parameters(parameters: &Parameters, mut args: Vec<String>) -> Vec<String> {
     if parameters.reverse_order == true {
         if parameters.last_modified_order == true {
@@ -329,6 +364,7 @@ fn check_parameters(parameters: &Parameters, mut args: Vec<String>) -> Vec<Strin
     args
 }
 
+// Navigates the subfolders recursively and collects them in a vector for the -R command output.
 fn directory_traversal(path: &PathBuf, parameters: &Parameters) -> Vec<PathBuf> {
     let mut directories: Vec<PathBuf> = Vec::new();
     // let directory = read_dir(path).unwrap();
@@ -338,17 +374,7 @@ fn directory_traversal(path: &PathBuf, parameters: &Parameters) -> Vec<PathBuf> 
         .collect::<Result<Vec<_>, _>>()
         .unwrap();
 
-    if parameters.reverse_order == true {
-        if parameters.last_modified_order == true {
-            reverse_rank_path_bufs_by_last_modified_date(&mut directory);
-        } else {
-            reverse_alphabetically_rank_path_bufs(&mut directory);
-        }
-    } else if parameters.last_modified_order == true {
-        rank_path_bufs_by_last_modified_date(&mut directory);
-    } else {
-        alphabetically_rank_path_bufs(&mut directory);
-    }
+    path_buf_rank_redirect(&mut directory, parameters);
 
     for entry in directory {
         if entry.is_dir() && !(get_path_name(&entry).starts_with('.')) {
@@ -360,16 +386,31 @@ fn directory_traversal(path: &PathBuf, parameters: &Parameters) -> Vec<PathBuf> 
     return directories;
 }
 
-fn handle_recursivity(args: &mut Vec<String>, parameters: &Parameters) {
-    let mut directories: Vec<PathBuf> = Vec::new();
-    let mut single_files: Vec<File> = Vec::new();
-    let number_of_arguments = args.len();
-
-    alphabetically_rank_strings(args);
-
-    if handle_single_files(args, parameters) == false && !args.is_empty() {
-        println!();
+// If only one folder was mentioned as argument, include the files in it. Requires a dedicated
+// function as the output is different for these files, than for the others that are part of the
+// directories that were recursively collected.
+fn include_root_files(single_files: &mut Vec<File>, folder: &String, parameters: &Parameters) {
+    match one_argument(folder, &parameters) {
+        Ok(mut files) => {
+            files.append(single_files);
+            if parameters.long_format == true {
+                long_format_print(files, parameters, false);
+            } else {
+                simple_print(files, &parameters);
+            }
+        }
+        Err(error_message) => println!("{}", error_message),
     }
+}
+
+// Creates a vector of all subfolders of the command's mentioned folders as arguments.
+fn assemble_vectors(
+    args: &mut Vec<String>,
+    directories: &mut Vec<PathBuf>,
+    single_files: &mut Vec<File>,
+    parameters: &Parameters,
+) {
+    let number_of_arguments = args.len();
 
     for i in &mut *args {
         let path = Path::new(&i);
@@ -386,26 +427,32 @@ fn handle_recursivity(args: &mut Vec<String>, parameters: &Parameters) {
             ));
         }
     }
+}
 
-    // println!("{:?}", directories);
+// Called when the -R parameter is included.
+fn handle_recursivity(args: &mut Vec<String>, parameters: &Parameters) {
+    let mut directories: Vec<PathBuf> = Vec::new();
+    let mut single_files: Vec<File> = Vec::new();
 
+    alphabetically_rank_strings(args);
+
+    // Handles specific files mentioned as arguments in the command.
+    if handle_single_files(args, parameters) == false && !args.is_empty() {
+        println!();
+    }
+
+    assemble_vectors(args, &mut directories, &mut single_files, parameters);
+
+    // If there is only one argument that is a folder, print its content first before the recursive
+    // output.
     if args.len() == 1 {
-        match one_argument(&args[0], &parameters) {
-            Ok(mut files) => {
-                files.append(&mut single_files);
-                if parameters.long_format == true {
-                    long_format_print(files, parameters, false);
-                } else {
-                    simple_print(files, &parameters);
-                }
-            }
-            Err(error_message) => println!("{}", error_message),
-        }
+        include_root_files(&mut single_files, &args[0], parameters);
         if !directories.is_empty() {
             println!();
         }
     }
 
+    // Print the contents of all the directories indexed by the directory_traversal function.
     handle_folders(
         convert_path_buf_vector_to_string_vector(&directories),
         true,

@@ -1,5 +1,6 @@
 use crate::*;
 
+// Returns a Vector with the arguments that are single files, leaving folders.
 fn find_single_files(args: &mut Vec<String>) -> Vec<String> {
     let mut counter = 0;
     let mut single_files: Vec<String> = Vec::new();
@@ -14,6 +15,7 @@ fn find_single_files(args: &mut Vec<String>) -> Vec<String> {
     single_files
 }
 
+// Remove the single files from the args vector, as they have already been processed.
 fn remove_single_files(args: &mut Vec<String>, single_files: &mut Vec<String>) {
     let mut counter = 0;
 
@@ -91,30 +93,30 @@ fn simple_print_single_files(files: &Vec<String>) {
     transpose_print_single_files(file_matrix, column_length);
 }
 
+fn string_rank_redirect(strings: &mut Vec<String>, parameters: &Parameters) {
+    if parameters.reverse_order == true {
+        if parameters.last_modified_order == true {
+            reverse_rank_path_by_last_modified_date(strings);
+        } else {
+            reverse_alphabetically_rank_strings(strings);
+        }
+    } else {
+        if parameters.last_modified_order == true {
+            rank_path_by_last_modified_date(strings);
+        } else {
+            alphabetically_rank_strings(strings);
+        }
+    }
+}
+
+// Takes care of printing single files, meaning files that are explicitly mentioned in the command
+// (as opposed to files in a mentioned folder, for example).
 pub fn handle_single_files(args: &mut Vec<String>, parameters: &Parameters) -> bool {
     let mut single_files = find_single_files(args);
 
     remove_single_files(args, &mut single_files);
 
-    if parameters.reverse_order == true {
-        if parameters.last_modified_order == true {
-            reverse_rank_path_by_last_modified_date(&mut single_files);
-        } else {
-            reverse_alphabetically_rank_strings(&mut single_files);
-        }
-    } else {
-        if parameters.last_modified_order == true {
-            rank_path_by_last_modified_date(&mut single_files);
-        } else {
-            alphabetically_rank_strings(&mut single_files);
-        }
-    }
-
-    // if parameters.reverse_order == true {
-    //     reverse_alphabetically_rank_strings(&mut single_files);
-    // } else {
-    //     alphabetically_rank_strings(&mut single_files);
-    // }
+    string_rank_redirect(&mut single_files, parameters);
 
     if !single_files.is_empty() {
         if parameters.long_format == true {
